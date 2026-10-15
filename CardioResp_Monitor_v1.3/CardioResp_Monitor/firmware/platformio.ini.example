@@ -1,0 +1,12 @@
+[platformio]
+src_dir = /home/claude/proj/CardioResp_Monitor/CardioRespMonitor
+
+[env:c3]
+platform = https://github.com/pioarduino/platform-espressif32/releases/download/stable/platform-espressif32.zip
+board = esp32-c3-devkitm-1
+framework = arduino
+board_build.flash_size = 4MB
+board_build.partitions = /home/claude/proj/CardioResp_Monitor/CardioRespMonitor/partitions.csv
+board_build.filesystem = littlefs
+build_flags = -DARDUINO_USB_MODE=1 -DARDUINO_USB_CDC_ON_BOOT=1 -Wall -Wno-unused-variable -Wno-unused-but-set-variable
+lib_deps = https://github.com/Links2004/arduinoWebSockets.git#2.7.2

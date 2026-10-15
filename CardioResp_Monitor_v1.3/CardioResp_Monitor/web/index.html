@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FBF6F4">
+<title>CardioResp Monitor</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23B42332'/%3E%3Cpath d='M4 17h6l3-8 5 15 3-7h7' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#FBF6F4; --panel:#FFFFFF; --grid1:#F4DAD4; --grid2:#E8B3A9; --ink:#1E2533; --muted:#5E6676;
+  --line:#EBDDD8; --heart:#B42332; --breath:#1D5FA8; --gyro:#6B4FA0; --ok:#2F7D4F; --warn:#9A5F0C; --alert:#B42332;
+  --heart-soft:#F7E1E3; --breath-soft:#E1ECF8; --num:"Bahnschrift","DIN Alternate","DIN Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+:root[data-theme="night"]{
+  --paper:#10161D; --panel:#161E27; --grid1:#1C2731; --grid2:#2A3946; --ink:#E4EAF0; --muted:#98A4B3;
+  --line:#26323D; --heart:#FF6F7A; --breath:#62A8FF; --gyro:#B79CFF; --ok:#5CC98A; --warn:#E8A94A; --alert:#FF6F7A;
+  --heart-soft:#3A1E24; --breath-soft:#172A40;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--body);-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--breath)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 14px 40px}
+:focus-visible{outline:2px solid var(--breath);outline-offset:2px}
+
+/* top bar */
+.bar{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px solid var(--line);padding:env(safe-area-inset-top) 0 0}
+.bar .in{max-width:1180px;margin:0 auto;padding:8px 14px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.brand{font-weight:650;letter-spacing:.2px;margin-right:auto;display:flex;align-items:center;gap:8px}
+.brand small{font-weight:400;color:var(--muted)}
+.chip{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted);display:inline-block}
+.dot.on{background:var(--ok)} .dot.bad{background:var(--alert)}
+.batt{display:inline-block;width:22px;height:11px;border:1.5px solid currentColor;border-radius:2px;position:relative}
+.batt:after{content:"";position:absolute;right:-4px;top:2px;width:2px;height:5px;background:currentColor;border-radius:1px}
+.batt i{position:absolute;left:1px;top:1px;bottom:1px;background:var(--ok);border-radius:1px}
+
+/* banners */
+.banner{margin:12px 0 0;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);display:none}
+.banner.show{display:block}
+.banner.alert{border-color:var(--alert);background:var(--heart-soft)}
+.banner h3{margin:0 0 4px;font-size:16px}
+.prog{height:6px;background:var(--grid1);border-radius:3px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;width:0;background:var(--breath);transition:width .3s}
+
+/* vital panels: the printed monitor strip */
+.vitals{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
+@media(min-width:900px){.vitals{grid-template-columns:1fr 1fr}}
+.vital{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.vhead{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:12px 14px 6px}
+.vname{font-size:14px;color:var(--muted)}
+.vname b{color:var(--ink);font-weight:600;font-size:15px}
+.vname .sub{margin-left:8px;white-space:nowrap}
+.vname b{white-space:nowrap}
+@media(max-width:520px){.vname .sub{display:block;margin-left:0;font-size:13px}}
+[hidden]{display:none!important}
+.big{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:64px;line-height:.95;font-weight:600;letter-spacing:-1px}
+.big small{font-size:18px;font-weight:500;margin-left:4px;letter-spacing:0;color:var(--muted)}
+.heart .big{color:var(--heart)} .resp .big{color:var(--breath)}
+.big.dim{opacity:.35}
+.side{text-align:right;font-size:13px;color:var(--muted);line-height:1.6;flex:0 0 auto}
+.side b{font-family:var(--num);font-size:18px;color:var(--ink);font-weight:600}
+.pulse{width:12px;height:12px;border-radius:50%;background:var(--heart);opacity:.2;display:inline-block;transition:opacity .08s}
+.pulse.beat{opacity:1}
+@media (prefers-reduced-motion:reduce){.pulse,.prog i{transition:none}}
+.strip{display:block;width:100%;height:170px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--paper)}
+.resp .strip{height:150px}
+.vfoot{display:flex;flex-wrap:wrap;gap:4px 16px;padding:8px 14px 12px;font-size:13px;color:var(--muted);align-items:center}
+.vfoot b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.sqi{display:inline-flex;align-items:center;gap:6px}
+.sqi .m{width:64px;height:6px;border-radius:3px;background:var(--grid1);overflow:hidden;display:inline-block}
+.sqi .m i{display:block;height:100%;background:var(--ok)}
+.range{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;display:inline-block}
+.range.ok{border-color:var(--ok);color:var(--ok)} .range.high,.range.low{border-color:var(--alert);color:var(--alert)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-left:auto}
+.seg button{background:none;border:0;padding:3px 10px;font-size:12px;color:var(--muted);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--breath-soft);color:var(--ink)}
+
+/* sections */
+h2{font-size:18px;margin:30px 0 10px;font-weight:650}
+h2 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
+.grid{display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:760px){.grid.g2{grid-template-columns:1fr 1fr}.grid.g3{grid-template-columns:1fr 1fr 1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.card h3{margin:0 0 6px;font-size:15px;font-weight:600}
+.card p{margin:4px 0;color:var(--muted);font-size:13px}
+.chart{display:block;width:100%;height:150px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-variant-numeric:tabular-nums}
+label{display:block;font-size:13px;color:var(--muted);margin:8px 0 3px}
+input[type=text],input[type=number],input[type=password],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+textarea{min-height:60px;resize:vertical}
+.row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.row>*{flex:1 1 120px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-weight:550;min-height:40px}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.warn{border-color:var(--warn);color:var(--warn)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+.agegroup{margin-top:8px;font-size:13px}
+.agegroup b{font-weight:600}
+
+/* detailed analysis */
+.analysis{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 16px 14px}
+.analysis section{border-bottom:1px solid var(--line);padding:10px 0}
+.analysis section:last-child{border-bottom:0}
+.analysis h3{margin:0 0 6px;font-size:15px}
+.finding{display:flex;gap:10px;align-items:flex-start;margin:5px 0;font-size:14px;max-width:80ch}
+.finding i{flex:0 0 8px;height:8px;border-radius:50%;margin-top:7px;background:var(--muted)}
+.finding.ok i{background:var(--ok)} .finding.warn i{background:var(--warn)} .finding.alert i{background:var(--alert)}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:500}
+.tablewrap{overflow-x:auto}
+.report{display:none}
+.report.show{display:block}
+.disclaimer{font-size:12px;color:var(--muted);margin-top:20px;max-width:80ch}
+.tip{font-size:12px;padding:8px 12px;border-radius:8px;background:var(--breath-soft);margin-top:12px;display:none}
+.tip.show{display:block}
+.faces{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.faces span{padding:3px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.faces span.done{border-color:var(--ok);color:var(--ok);font-weight:600}
+details summary{cursor:pointer;color:var(--breath);font-size:13px;margin-top:12px}
+label.inline{display:flex;align-items:center;gap:8px;color:var(--ink)}
+.netmsg{margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--breath-soft);font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.netmsg.bad{background:var(--heart-soft)}
+.netmsg a{font-weight:650;color:var(--ink)}
+#netTop .card{margin-top:12px;border-color:var(--breath)}
+.banner .x{float:right;background:none;border:0;font-size:20px;line-height:1;color:var(--muted);cursor:pointer;padding:0 4px}
+
+@media print{
+  .bar,.banner,.vitals,.nop,.btns,#spectraSec,#orientSec,#deviceSec{display:none!important}
+  body{background:#fff;color:#000}
+  .analysis,.card{border:0}
+}
+
+/* ---- v1.2 ---- */
+.page{display:none}.page.show{display:block}
+.page>h2:first-child{margin-top:18px}
+.z0{color:var(--ok)}.z1{color:var(--warn)}.z2{color:#C2570C}.z3{color:var(--alert)}
+.big.z1,.big.z2,.big.z3,.heart .big.z1,.heart .big.z2,.heart .big.z3,.resp .big.z1,.resp .big.z2,.resp .big.z3{opacity:1}
+.heart .big.z0,.resp .big.z0{color:var(--ok)}
+.heart .big.z1,.resp .big.z1{color:var(--warn)}.heart .big.z2,.resp .big.z2{color:#C2570C}.heart .big.z3,.resp .big.z3{color:var(--alert)}
+.sev{display:inline-block;padding:3px 12px;border-radius:999px;font-size:13px;font-weight:650;border:1.5px solid var(--muted);color:var(--muted)}
+.sev.s0{border-color:var(--ok);color:var(--ok)}.sev.s1{border-color:var(--warn);color:var(--warn)}
+.sev.s2{border-color:#C2570C;color:#C2570C}.sev.s3{border-color:var(--alert);color:#fff;background:var(--alert)}
+.assess{margin-top:14px;border-left:5px solid var(--muted)}
+.assess.s0{border-left-color:var(--ok)}.assess.s1{border-left-color:var(--warn)}.assess.s2{border-left-color:#C2570C}.assess.s3{border-left-color:var(--alert)}
+.assess h3{font-size:17px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.assess .cond{font-size:14px;margin:2px 0 8px}
+.meters{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px;color:var(--muted);margin:6px 0}
+.meters b{color:var(--ink);font-variant-numeric:tabular-nums}
+.ev{list-style:none;margin:6px 0;padding:0;font-size:13.5px}
+.ev li{display:flex;gap:8px;margin:3px 0}.ev li i{flex:0 0 8px;height:8px;border-radius:50%;margin-top:7px;background:var(--muted)}
+.ev li.a i{background:var(--alert)}.ev li.w i{background:var(--warn)}.ev li.i i{background:var(--breath)}
+.miss{font-size:12.5px;color:var(--muted);margin:6px 0 0;padding-left:18px}
+.pbars{display:grid;grid-template-columns:auto 1fr auto;gap:2px 8px;font-size:12px;margin-top:8px;align-items:center}
+.pbars .m{height:6px;border-radius:3px;background:var(--grid1);overflow:hidden}.pbars .m i{display:block;height:100%;background:var(--breath)}
+.vibgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:6px}
+.vibgrid div{border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.vibgrid span{display:block;font-size:12px;color:var(--muted)}
+.vibgrid b{font-family:var(--num);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.vibgrid small{font-size:12px;color:var(--muted);margin-left:3px}
+body.lite .fullonly{display:none!important}
+/* v1.4: without an activation licence no graphs are shown (placement drawing stays for setting up) */
+body.lite .strip,body.lite #anaDrop,body.lite .swave,body.lite .vfoot{display:none!important}
+body.lite .vitals::after{content:"Live graphs need an activation licence (Settings \2192  Licence).";display:block;grid-column:1/-1;padding:14px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center}
+/* v1.4: sub-tabs - long pages show one part at a time */
+.subtabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 14px}.subtabs button{font:inherit;font-size:14px;padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}.subtabs button[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.subhide{display:none!important}
+#pg-live.sub-graphs .strip{height:34vh;min-height:170px}
+.lic{margin:12px 0 0;padding:12px 14px;border-radius:10px;border:1px solid var(--alert);background:var(--heart-soft);display:none}
+.lic.show{display:block}.lic.soft{border-color:var(--warn);background:var(--panel)}
+.lic h3{margin:0 0 4px;font-size:16px}
+.meshgrid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.node{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--muted);border-radius:12px;padding:10px 12px;font-size:13px}
+.node.s0{border-left-color:var(--ok)}.node.s1{border-left-color:var(--warn)}.node.s2{border-left-color:#C2570C}.node.s3{border-left-color:var(--alert)}
+.node h4{margin:0 0 4px;font-size:15px;display:flex;justify-content:space-between;gap:8px}
+.node .nv{display:flex;gap:18px;margin:4px 0}
+.node .nv b{font-family:var(--num);font-size:28px;font-weight:600}
+.node .nv small{display:block;font-size:11px;color:var(--muted)}
+.node.old{opacity:.55}
+table.files td:last-child,table.files th:last-child{text-align:right}
+.prog.big{height:10px}
+.small{font-size:12px;color:var(--muted)}
+.who{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:14px}
+.who dt{color:var(--muted)}.who dd{margin:0}
+@media print{.tabs,.lic{display:none!important}.page{display:block!important}}
+
+/* ---- v1.2 final: navigation, toolbar, alarms, interactive colours ---- */
+:root{--gyro-soft:#ECE6F6;--ok-soft:#E2F1E8;--warn-soft:#F8ECD8;--alert-soft:#F7E1E3;--orange:#C2570C;--shadow:0 1px 2px rgba(30,37,51,.06),0 4px 14px rgba(30,37,51,.05);--navw:200px}
+:root[data-theme="night"]{--gyro-soft:#271F3D;--ok-soft:#163223;--warn-soft:#3A2C14;--alert-soft:#3A1E24;--orange:#F08A3C;--shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.25)}
+.z2{color:var(--orange)}.heart .big.z2,.resp .big.z2{color:var(--orange)}
+.sev.s2{border-color:var(--orange);color:var(--orange)}.assess.s2{border-left-color:var(--orange)}.node.s2{border-left-color:var(--orange)}
+.card,.vital,.analysis{box-shadow:var(--shadow)}
+.vital{transition:box-shadow .2s,border-color .2s}
+.vital.heart{border-top:3px solid var(--heart)}.vital.resp{border-top:3px solid var(--breath)}
+.vital.alarming{border-color:var(--alert);box-shadow:0 0 0 2px var(--alert-soft),var(--shadow)}
+/* navigation: bottom bar on phones, left side bar on wide screens */
+.tabs{position:fixed;z-index:8;background:var(--panel);display:flex;border:0}
+.tabs .navbrand{display:none}
+.tabs a{display:flex;align-items:center;color:var(--muted);text-decoration:none;font-weight:560;border-radius:12px;transition:background .15s,color .15s,transform .08s;-webkit-tap-highlight-color:transparent;position:relative}
+.tabs a svg{width:24px;height:24px;flex:0 0 24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tabs a:hover{color:var(--c);background:var(--cs)}
+.tabs a:active{transform:scale(.95)}
+.tabs a[aria-current="page"]{color:var(--c);background:var(--cs);font-weight:680}
+.tabs a .badge{position:absolute;top:4px;right:calc(50% - 20px);min-width:9px;height:9px;border-radius:5px;background:var(--alert);display:none}
+.tabs a.alarm .badge{display:block}
+@media (max-width:899px){
+  .tabs{left:0;right:0;bottom:0;border-top:1px solid var(--line);padding:5px 6px calc(5px + env(safe-area-inset-bottom));gap:4px;justify-content:space-around;box-shadow:0 -6px 18px rgba(0,0,0,.07)}
+  .tabs a{flex:1 1 0;flex-direction:column;gap:2px;font-size:11.5px;padding:6px 2px 5px;min-height:52px;justify-content:center}
+  body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+}
+@media (min-width:900px){
+  .tabs{top:0;bottom:0;left:0;width:var(--navw);flex-direction:column;border-right:1px solid var(--line);padding:14px 12px;gap:6px}
+  .tabs .navbrand{display:flex;align-items:center;gap:8px;font-weight:700;padding:6px 10px 18px;font-size:16px}
+  .tabs .navbrand .pulse{opacity:1}
+  .tabs a{flex-direction:row;gap:12px;font-size:15px;padding:11px 14px}
+  .tabs a .badge{top:8px;right:10px}
+  body{padding-left:var(--navw)}
+  .bar .brand .pulse{display:none}
+}
+/* buttons with colour feedback */
+.btn{transition:background .15s,border-color .15s,color .15s,box-shadow .15s,transform .08s;-webkit-tap-highlight-color:transparent}
+.btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 18px}
+.btn svg .fill{fill:currentColor;stroke:none}
+.btn:not(:disabled):hover{border-color:var(--breath);color:var(--breath);box-shadow:0 2px 8px rgba(29,95,168,.15)}
+.btn:not(:disabled):active{transform:translateY(1px) scale(.98)}
+.btn.primary:not(:disabled):hover{background:var(--breath);border-color:var(--breath);color:#fff}
+.btn.warn:not(:disabled):hover{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.btn.rec{background:var(--heart);border-color:var(--heart);color:#fff}
+.btn.rec:not(:disabled):hover{background:var(--heart);color:#fff;border-color:var(--heart);box-shadow:0 2px 10px rgba(180,35,50,.35);filter:brightness(1.08)}
+.btn.pdf:not(:disabled){border-color:var(--breath);color:var(--breath);background:var(--breath-soft)}
+.btn.pdf:not(:disabled):hover{background:var(--breath);color:#fff}
+.btn.tog[aria-pressed="true"]{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.btn.tog.snd[aria-pressed="false"]{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+#btnPause[aria-pressed="true"]{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.btn.sm{min-height:34px;padding:5px 12px;font-size:13px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.toolbar .tsp{flex:1 1 auto}
+@media(max-width:560px){
+  .toolbar{gap:6px}.toolbar .tsp{display:none}
+  .toolbar .btn.rec,.toolbar .btn.pdf{flex:1 1 calc(50% - 6px)}
+  .toolbar #btnCsv,.toolbar #btnPrint,.toolbar #btnShare,.toolbar #btnPause,.toolbar #btnSound{flex:1 1 calc(25% - 6px);flex-direction:column;gap:2px;font-size:11.5px;padding:5px 2px;min-height:48px}
+}
+@media(max-width:560px){.alarmbar{flex-wrap:wrap;gap:6px 10px}.alarmbar .al{flex:1 1 calc(100% - 40px)}.alarmbar .btn{margin-left:auto}}
+.mini{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:3px 10px;font-size:12px;color:var(--breath);cursor:pointer;transition:background .15s}
+.mini svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mini:hover{background:var(--breath-soft)}.mini:active{transform:scale(.96)}
+.mini.on{background:var(--breath-soft);border-color:var(--breath)}
+.seg button:hover{background:var(--breath-soft);color:var(--ink)}
+.seg.wide{margin:6px 0 8px;display:flex}.seg.wide button{flex:1 1 0;padding:9px 10px;font-size:14px;font-weight:560}
+.seg.wide button[aria-pressed="true"]{background:var(--breath);color:#fff}
+/* report box and placement card */
+.report{margin-top:12px}
+.report .analysis{border-left:4px solid var(--breath)}
+.subh{font-size:15px;margin:18px 0 8px;font-weight:650}
+.subh small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+.place{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.place canvas{flex:0 0 180px;width:180px;height:180px}
+.place>div{flex:1 1 220px}
+.tips{margin:10px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
+.tips li{margin:3px 0}
+#orientSec{margin-top:14px;border-left:4px solid var(--gyro)}
+/* analysis drop-down */
+.drop{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.drop>summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin:0;color:var(--ink);border-radius:12px;transition:background .15s}
+.drop>summary::-webkit-details-marker{display:none}
+.drop>summary:before{content:"";width:9px;height:9px;border-right:2.5px solid var(--breath);border-bottom:2.5px solid var(--breath);transform:rotate(-45deg);transition:transform .2s;margin-right:4px}
+.drop[open]>summary:before{transform:rotate(45deg)}
+.drop>summary:hover{background:var(--breath-soft)}
+.drop .dt{font-weight:650;font-size:16px}.drop .ds{font-size:13px;color:var(--muted)}
+.dropin{padding:0 14px 16px}
+.dropin>.analysis{box-shadow:none}
+/* alarm bar */
+.alarmbar{position:fixed;z-index:9;left:10px;right:10px;bottom:calc(80px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;color:#fff;background:var(--warn);box-shadow:0 8px 26px rgba(0,0,0,.25)}
+@media (min-width:900px){.alarmbar{left:calc(var(--navw) + 16px);right:16px;bottom:16px;max-width:760px;margin:0 auto}}
+.alarmbar svg{width:24px;height:24px;flex:0 0 24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.alarmbar .al{flex:1 1 auto;font-size:14px;line-height:1.35}
+.alarmbar .al b{font-weight:700}
+.alarmbar .al span{display:block}.alarmbar .al .a2{font-size:12.5px;opacity:.95;margin-top:2px}
+.alarmbar.p3{background:var(--alert);animation:alpulse 1s ease-in-out infinite}
+.alarmbar.p2{background:var(--orange)}
+.alarmbar.p1{background:var(--warn)}
+.alarmbar .btn{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.6);color:#fff;flex:0 0 auto}
+.alarmbar .btn:hover{background:rgba(255,255,255,.3);color:#fff;border-color:#fff}
+.alarmbar.sil{opacity:.85;animation:none}
+body.alarmon .wrap{padding-bottom:120px}
+@keyframes alpulse{0%,100%{box-shadow:0 8px 26px rgba(180,35,50,.35)}50%{box-shadow:0 0 0 6px rgba(180,35,50,.25),0 8px 26px rgba(180,35,50,.45)}}
+@media (prefers-reduced-motion:reduce){.alarmbar.p3{animation:none}}
+.altab td,.altab th{text-align:left;vertical-align:middle}
+.altab td:last-child,.altab th:last-child{text-align:right}
+.altab .pr{display:inline-block;font-size:11px;font-weight:650;border-radius:999px;padding:1px 8px;margin-left:6px}
+.altab .pr.lk{background:var(--breath-soft);color:var(--breath)}.okt{color:var(--ok)!important;font-weight:600}.badt{color:var(--alert)!important;font-weight:600}
+.altab .pr.p3{background:var(--alert-soft);color:var(--alert)}.altab .pr.p2{background:var(--warn-soft);color:var(--orange)}.altab .pr.p1{background:var(--warn-soft);color:var(--warn)}
+.altab small{display:block;color:var(--muted);font-size:12px}.altab small.snd{color:var(--breath)}.altab td:first-child{width:30px}
+input[type=range]{width:100%;accent-color:var(--breath)}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--breath)}
+label.sw{font-size:15px;font-weight:560}
+table.files td:last-child a{font-weight:600;text-decoration:none;padding:2px 4px;border-radius:6px}
+table.files td:last-child a:hover{background:var(--breath-soft)}
+table.files a.pdfl{color:var(--heart)}
+table.files tbody tr:hover{background:var(--breath-soft)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--breath);box-shadow:0 0 0 3px var(--breath-soft)}
+[data-dismissed]{display:none!important}
+.lic .x,.tip .x{float:right;background:none;border:0;font-size:22px;line-height:1;color:var(--muted);cursor:pointer;padding:0 4px;margin:-4px -4px 0 8px}
+.banner .x,.lic .x,.tip .x{width:32px;height:32px;border-radius:8px;transition:background .15s,color .15s}
+.banner .x:hover,.lic .x:hover,.tip .x:hover{background:var(--heart-soft);color:var(--alert)}
+.alarmbar .ax{background:none;border:0;color:#fff;font-size:24px;line-height:1;width:34px;height:34px;border-radius:8px;cursor:pointer;flex:0 0 auto}
+.alarmbar .ax:hover{background:rgba(255,255,255,.2)}
+@media print{.tabs,.alarmbar,.toolbar,#logState,.drop>summary{display:none!important}body{padding:0!important}.drop{border:0;box-shadow:none}}
+.vst{display:inline-block;font-size:12px;font-weight:650;border-radius:999px;padding:1px 9px}
+.vst.ok{background:var(--ok-soft);color:var(--ok)}.vst.pin{background:var(--alert-soft);color:var(--alert)}.vst.grp{background:var(--warn-soft);color:var(--warn)}.vst.old{background:var(--breath-soft);color:var(--breath)}
+#mgTab td{vertical-align:middle}#mgTab td small{display:block;color:var(--muted)}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.hrow .seg{margin-left:auto}
+#evTab td{text-align:left;vertical-align:top}#evTab td:last-child{text-align:right;white-space:nowrap}
+.grid>*{min-width:0}             /* wide tables scroll inside their card instead of widening the page */
+.drop,.dropin{min-width:0;overflow-wrap:anywhere}
+
+/* ================= v1.3: clean Apple-style look, plain-language status, Start button ================= */
+:root{          /* v1.3 keeps the v1.2 colour scheme (warm paper, deep red heart, blue breathing); only the layout changed */
+  --paper:#FBF6F4; --panel:#FFFFFF; --grid1:#F4DAD4; --grid2:#E8B3A9; --ink:#1E2533; --muted:#5E6676;
+  --line:#EBDDD8; --heart:#B42332; --breath:#1D5FA8; --gyro:#6B4FA0; --ok:#2F7D4F; --warn:#9A5F0C; --alert:#B42332;
+  --heart-soft:#F7E1E3; --breath-soft:#E1ECF8; --gyro-soft:#ECE6F6; --ok-soft:#E2F1E8; --warn-soft:#F8ECD8; --alert-soft:#F7E1E3; --orange:#C2570C;
+  --green:#2F7D4F; --fill:#F3EBE8; --fill2:#FBF6F4; --bar:rgba(251,246,244,.9);
+  --num:"SF Pro Rounded",ui-rounded,"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --shadow:0 1px 2px rgba(30,37,51,.06),0 4px 14px rgba(30,37,51,.05); --r:18px;
+}
+:root[data-theme="night"]{
+  --paper:#10161D; --panel:#161E27; --grid1:#1C2731; --grid2:#2A3946; --ink:#E4EAF0; --muted:#98A4B3;
+  --line:#26323D; --heart:#FF6F7A; --breath:#62A8FF; --gyro:#B79CFF; --ok:#5CC98A; --warn:#E8A94A; --alert:#FF6F7A;
+  --heart-soft:#3A1E24; --breath-soft:#172A40; --gyro-soft:#271F3D; --ok-soft:#163223; --warn-soft:#3A2C14; --alert-soft:#3A1E24; --orange:#F08A3C;
+  --green:#2E8B57; --fill:#202B36; --fill2:#1B2530; --bar:rgba(16,22,29,.9); --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.25);
+}
+html,body{font:15px/1.45 var(--body);letter-spacing:-.008em}
+.wrap{max-width:1120px;padding:0 16px 48px}
+h2{font-size:22px;font-weight:700;letter-spacing:-.02em;margin:30px 2px 10px}
+.card h3{font-size:16px;font-weight:650;letter-spacing:-.01em}
+.card,.vital,.analysis,.drop,.node{border:0;border-radius:var(--r);box-shadow:var(--shadow)}
+.card{padding:16px 18px}
+.vital{border-top:0!important}
+.vital.alarming{box-shadow:0 0 0 2.5px var(--alert),var(--shadow)}
+.bar{background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(18px);backdrop-filter:saturate(180%) blur(18px);border-bottom:.5px solid var(--line)}
+.brand{font-weight:700;letter-spacing:-.01em}
+.chip{font-size:12.5px}
+/* buttons: filled, rounded, iOS-like */
+.btn{border:0;background:var(--fill);color:var(--ink);border-radius:12px;font-weight:600;min-height:42px;padding:9px 16px}
+.btn:not(:disabled):hover{border-color:transparent;color:var(--breath);box-shadow:none;filter:brightness(.97)}
+.btn.primary{background:var(--ink);color:var(--paper)}
+.btn.primary:not(:disabled):hover{background:var(--ink);color:var(--paper);filter:brightness(1.15)}
+.btn.warn{background:var(--warn-soft);color:var(--warn)}
+.btn.danger{background:var(--alert-soft);color:var(--alert)}
+.btn.danger:not(:disabled):hover{color:var(--alert)}
+.btn.rec{background:var(--heart);color:#fff}
+.btn.pdf:not(:disabled){background:var(--breath-soft);color:var(--breath);border:0}
+.btn.tog[aria-pressed="true"]{background:var(--ok-soft);color:var(--ok)}
+.btn.tog.snd[aria-pressed="false"]{background:var(--warn-soft);color:var(--warn)}
+.mini{border:0;background:var(--fill);border-radius:9px}
+.seg{border:0;background:var(--fill);border-radius:9px;padding:2px}
+.seg button{border-radius:7px;color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg.wide button[aria-pressed="true"]{background:var(--panel);color:var(--ink)}
+input[type=text],input[type=number],input[type=password],select,textarea{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:9px 11px}
+/* navigation: translucent tab bar / side bar */
+.tabs{background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+@media (max-width:899px){.tabs{border-top:.5px solid var(--line);box-shadow:none}}
+@media (min-width:900px){.tabs{border-right:.5px solid var(--line)}}
+.tabs a{border-radius:10px}
+.tabs a[aria-current="page"]{background:transparent}
+@media (min-width:900px){.tabs a[aria-current="page"]{background:var(--cs)}}
+/* big numbers */
+.big{font-family:var(--num);font-weight:700;letter-spacing:-.02em;font-size:60px}
+.big small{font-family:var(--body);font-weight:600;font-size:17px}
+.vhead{padding:14px 18px 8px}
+.vname b{font-size:16px}
+.vfoot{padding:10px 18px 14px}
+.strip{border-color:var(--line)}
+.side b{font-family:var(--num);font-weight:700}
+.range{border:0;background:var(--fill)}
+.range.ok{background:var(--ok-soft);color:var(--ok)}
+.range.high,.range.low{background:var(--alert-soft);color:var(--alert)}
+.sev{border:0;padding:4px 12px;background:var(--fill)}
+.sev.s0{background:var(--ok-soft);color:var(--ok)}.sev.s1{background:var(--warn-soft);color:var(--warn)}
+.sev.s2{background:var(--warn-soft);color:var(--orange)}.sev.s3{background:var(--alert);color:#fff}
+.assess{border-left:0!important}
+.banner,.lic,.tip{border:0;border-radius:14px;box-shadow:var(--shadow)}
+.drop>summary{border-radius:var(--r)}
+/* ---- v1.3 large title and status hero ---- */
+.ltitle{display:flex;align-items:baseline;gap:10px;margin:18px 2px 10px;font-size:32px;font-weight:800;letter-spacing:-.025em}
+.ltitle small{font-size:14px;font-weight:500;color:var(--muted);letter-spacing:0}
+.hero{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;align-items:center;background:var(--panel);border-radius:22px;box-shadow:var(--shadow);padding:18px 18px 18px 22px;margin-top:4px;position:relative;overflow:hidden}
+.hero:before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--hc,var(--muted))}
+.hero .htxt{display:contents}
+.hero .hico{grid-column:1;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:var(--hs,var(--fill));color:var(--hc,var(--muted))}
+.hero .hico svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.hero h2{grid-column:2;margin:0;font-size:22px;line-height:1.2}
+.hero .hmsg,.hero .checks{grid-column:1 / -1}
+.hero .hmsg{margin:0;color:var(--muted);font-size:15px;max-width:72ch}
+.hero .hmsg ol{margin:0;padding-left:22px}.hero .hmsg li{margin:3px 0;padding-left:2px}
+.hero .hmsg li::marker{color:var(--hc);font-weight:700}
+.hero .checks{margin:0}
+.hero .hbtns{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:10px}
+.hero .hbtns .btn{min-height:50px;font-size:17px;padding:12px 22px;border-radius:14px}
+.btn.start{background:var(--green);color:#fff;flex:1 1 220px}
+.btn.start:not(:disabled):hover{background:var(--green);color:#fff;filter:brightness(1.06)}
+.btn.stop{background:var(--fill);color:var(--alert);flex:0 1 160px}
+.hero .hprog{grid-column:1 / -1;height:8px;border-radius:4px;background:var(--fill);overflow:hidden}
+.hero .hprog i{display:block;height:100%;width:0;background:var(--hc,var(--breath));transition:width .4s}
+.hero.s-ok{--hc:var(--green);--hs:var(--ok-soft)}
+.hero.s-watch{--hc:var(--warn);--hs:var(--warn-soft)}
+.hero.s-warn{--hc:var(--orange);--hs:var(--warn-soft)}
+.hero.s-alert{--hc:var(--alert);--hs:var(--alert-soft)}
+.hero.s-ready{--hc:var(--breath);--hs:var(--breath-soft)}
+.hero.s-cal{--hc:var(--gyro);--hs:var(--gyro-soft)}
+.hero.s-wait{--hc:var(--muted);--hs:var(--fill)}
+.hero.s-alert h2{color:var(--alert)}
+.hero.s-alert{animation:herop 1.2s ease-in-out infinite}
+@keyframes herop{0%,100%{box-shadow:var(--shadow)}50%{box-shadow:0 0 0 3px var(--alert-soft),var(--shadow)}}
+@media (prefers-reduced-motion:reduce){.hero.s-alert{animation:none}}
+.checks{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 8px}
+.checks li{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:5px 10px;border-radius:999px;background:var(--fill)}
+.checks li:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.checks li.ok{background:var(--ok-soft);color:var(--ok)}.checks li.ok:before{background:var(--ok)}
+.checks li.bad{background:var(--warn-soft);color:var(--warn)}.checks li.bad:before{background:var(--warn)}
+.checks li.no{background:var(--alert-soft);color:var(--alert)}.checks li.no:before{background:var(--alert)}
+@media (max-width:520px){.hero{padding:16px 16px 16px 20px}.hero .hico{width:42px;height:42px;border-radius:13px}.hero h2{font-size:20px}.big{font-size:52px}}
+/* heart paused by breathing movement */
+.vital .vnote{display:none;margin:0 18px 8px;padding:8px 12px;border-radius:12px;background:var(--warn-soft);color:var(--warn);font-size:13px}
+.vital.art .vnote{display:block}
+.vital.art .big{opacity:.35}
+/* breath counter */
+.bcount{display:inline-flex;align-items:baseline;gap:4px}
+.bcount b{font-family:var(--num);font-size:18px}
+/* assessment: long-term observation bar and details */
+.obs{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);margin:8px 0 2px}
+.obs .m{flex:1 1 auto;max-width:280px;height:6px;border-radius:3px;background:var(--fill);overflow:hidden}
+.obs .m i{display:block;height:100%;width:0;background:var(--breath)}
+.obs.done .m i{background:var(--green)}
+details.clin>summary{color:var(--breath);font-size:13px;margin-top:10px}
+/* placement card */
+#orientSec{border-left:0!important}
+.place canvas{border-radius:50%}
+.pcheck{margin:10px 0 0}
+.place>.pfigs{display:flex;gap:14px;align-items:flex-end;flex:0 1 auto;flex-wrap:wrap;justify-content:center}
+.place figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:4px}
+.place figcaption{font-size:12px;color:var(--muted);max-width:100%;text-align:center;line-height:1.3}
+.place figure.torso{width:140px}.place figure.gfig{width:170px}
+.place .gfig canvas{flex:none;width:170px;height:170px}
+.torso svg{width:140px;height:168px;display:block}
+.torso .bd{fill:var(--fill2);stroke:var(--muted);stroke-width:1.3;stroke-linejoin:round}
+.torso .ln{fill:none;stroke:var(--muted);stroke-width:1;opacity:.45;stroke-linecap:round}
+.torso .dash{stroke-dasharray:2 3}
+.torso .sn{fill:var(--heart)}
+.torso .zo{fill:none;stroke:#fff;stroke-width:1.3}.torso .zd{fill:#fff}
+.torso .ay,.torso .ax{fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.torso .ay{stroke:var(--breath)}.torso .ax{stroke:var(--gyro)}
+.torso text{font:600 9.5px var(--body)}
+.torso .ty{fill:var(--breath)}.torso .tx{fill:var(--gyro)}.torso .tz{fill:var(--heart)}
+@media (max-width:430px){.torso svg{width:112px;height:134px}.place .gfig canvas{width:146px;height:146px}.place figure.torso{width:118px}.place figure.gfig{width:150px}.place>.pfigs{gap:10px}}
+/* settings: maintenance */
+.danger-zone{border:1.5px solid var(--alert-soft)}
+label.inline.chk{font-size:14px;margin-top:10px}
+.small.okt{color:var(--ok)}
+/* hero: simple view button */
+.btn.simplebtn{background:var(--fill);color:var(--ink);flex:0 1 auto}
+.hero .hbtns .btn.stop,.hero .hbtns .btn.simplebtn{flex:1 1 130px;padding:12px 14px}
+.hero .hbtns .btn.start + .btn.stop[hidden] + .btn.simplebtn{flex:1 1 100%}
+.btn.simplebtn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+/* network sharing and other monitors */
+.share{margin:12px 0 4px;display:flex;flex-direction:column;gap:12px}
+.share .addr{display:flex;flex-direction:column;gap:2px}
+.share .addr span{font-size:13px;color:var(--muted)}
+.share .addr a{font-family:var(--num);font-size:26px;font-weight:700;letter-spacing:-.01em;color:var(--breath);text-decoration:none;word-break:break-all}
+.share .addr small{font-size:13px;color:var(--muted)}
+.qrs{display:flex;flex-wrap:wrap;gap:14px}
+.qrs figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;width:148px}
+.qrs figcaption{font-size:12px;color:var(--muted);text-align:center;line-height:1.3}
+.qr{width:148px;height:148px;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 0 0 1px var(--line)}
+.qr svg{display:block;width:100%;height:100%}
+.peers{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:4px}
+.peer{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:14px;background:var(--fill2);text-decoration:none;color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.peer a{text-decoration:none;color:var(--breath)}.peer b{font-family:var(--num);font-size:18px;color:var(--breath)}
+.peer span{font-size:13px;color:var(--muted)}
+.peer.me{background:var(--breath-soft)}
+/* v1.3 simple full-screen view: only heart rate and the breathing pattern */
+.simple{position:fixed;inset:0;z-index:50;background:var(--paper);display:flex;flex-direction:column;gap:12px;
+  padding:calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+.simple[hidden]{display:none}
+body.simpleon{overflow:hidden}
+body.simpleon .alarmbar{z-index:60;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));max-width:none}
+.sbar{display:flex;align-items:center;gap:12px;min-height:44px}
+.sstate{flex:1 1 auto;display:flex;align-items:center;gap:10px;font-size:clamp(16px,2.4vw,24px);font-weight:700;letter-spacing:-.01em;min-width:0}
+.sstate:before{content:"";flex:0 0 12px;height:12px;border-radius:50%;background:var(--sc,var(--muted))}
+.sstate.s-ok{--sc:var(--green)}.sstate.s-watch{--sc:var(--warn)}.sstate.s-warn{--sc:var(--orange)}.sstate.s-ready{--sc:var(--breath)}.sstate.s-cal{--sc:var(--gyro)}
+.sstate.s-alert{--sc:var(--alert);color:var(--alert)}
+.sclock{white-space:nowrap;font-family:var(--num);font-size:clamp(16px,2.2vw,22px);color:var(--muted);font-weight:600}
+.sx{flex:0 0 44px;width:44px;height:44px;border-radius:50%;border:0;background:var(--fill);color:var(--ink);font-size:28px;line-height:1;cursor:pointer}
+.sgrid{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto minmax(150px,1fr);gap:12px}
+.scell{background:var(--panel);border-radius:26px;box-shadow:var(--shadow);padding:14px 22px 16px;display:flex;flex-direction:column;justify-content:center;min-width:0}
+.slab{display:flex;align-items:center;gap:8px;font-size:clamp(15px,2vw,22px);font-weight:650;color:var(--muted)}
+.slab svg{width:1.3em;height:1.3em;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.heart .slab svg{color:var(--heart);fill:var(--heart);transition:transform .08s}
+.heart .slab svg.beat{transform:scale(1.25)}
+.resp .slab svg{color:var(--breath)}
+.sbig{font-family:var(--num);font-weight:800;line-height:1;letter-spacing:-.04em;font-size:clamp(52px,min(15vw,24vh),220px);font-variant-numeric:tabular-nums;margin-top:4px}
+.sbig small{font-size:.2em;font-weight:600;letter-spacing:0;color:var(--muted);margin-left:.25em}
+.heart .sbig{color:var(--heart)}.resp .sbig{color:var(--breath)}
+.sbig.dim{opacity:.35}
+.sbig.z1{color:var(--warn)}.sbig.z2{color:var(--orange)}.sbig.z3{color:var(--alert)}
+.ssub{font-size:clamp(13px,1.7vw,18px);color:var(--muted);margin-top:6px}
+.swave{grid-column:1 / -1;position:relative;background:var(--panel);border-radius:26px;box-shadow:var(--shadow);overflow:hidden;min-height:150px}
+.swave canvas{position:absolute;inset:0;width:100%;height:100%}
+.swl{position:absolute;left:20px;top:12px;font-size:13px;font-weight:600;color:var(--muted)}
+.sidle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;text-align:center}
+.sidle[hidden]{display:none}
+.sidle p{margin:0;font-size:clamp(18px,3vw,30px);font-weight:700;color:var(--ink)}
+.sidle .btn.start{flex:none;min-height:56px;font-size:19px;padding:12px 28px;border-radius:16px}
+@media (orientation:portrait) and (max-width:700px){.sgrid{grid-template-columns:1fr;grid-template-rows:auto auto minmax(160px,1fr)}.sbig{font-size:clamp(56px,min(22vw,13vh),170px)}}
+@media (prefers-reduced-motion:reduce){.heart .slab svg{transition:none}}
+@media (max-height:520px) and (orientation:landscape){.simple{gap:8px}.sbar{min-height:38px}.sgrid{gap:8px;grid-template-rows:auto minmax(110px,1fr)}.scell{padding:8px 18px 10px;border-radius:20px}.slab{font-size:15px}.ssub{margin-top:2px;font-size:13px}.sbig{font-size:clamp(46px,min(15vw,20vh),200px)}.swave{min-height:110px;border-radius:20px}.sx{width:38px;height:38px;flex-basis:38px;font-size:24px}}
+/* v1.3 alarm limits */
+.lims{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:6px}
+.limg{background:var(--fill2);border-radius:14px;padding:12px 14px;box-shadow:0 0 0 1px var(--line)}
+.limg h4{margin:0 0 8px;font-size:15px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 6px}.limg h4 .ht{white-space:nowrap}
+.limg h4 small{font-weight:500;color:var(--muted);font-size:12.5px}
+.limg .lf{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+.limg .lf div{display:flex;flex-direction:column;gap:2px}
+.limg .lf span{font-size:12px;color:var(--muted)}
+.limg .lf b{font-family:var(--num);font-size:19px}
+.limg .lf b.u{color:var(--alert)}
+.limg .lf b.w{color:var(--warn)}
+.limg .lf input{padding:7px 9px;font-size:16px;font-family:var(--num);width:100%}
+.limg .lf input.chg{box-shadow:0 0 0 2px var(--breath)}
+.limg .lf input:disabled{opacity:.55}
+.limg .lf small.tf{font-size:12.5px;color:var(--muted)}
+.limg h4 .seg.tus{margin-left:auto;font-size:13px}.limg h4 .seg.tus button{padding:3px 10px;min-height:28px}
+#almEdit svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+details.almpin,details.almlog{margin-top:12px}
+details.almpin>summary,details.almlog>summary{color:var(--breath);font-size:14px;cursor:pointer}
+.almlogl{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
+.almlogl li{margin:3px 0}
+.hint.badt{color:var(--alert)}
+/* print */
+@media print{.hero,.ltitle,.simple{display:none!important}}
+</style>
+</head>
+<body>
+<div class="bar"><div class="in">
+  <div class="brand"><span class="pulse" id="pulse"></span>CardioResp <small id="devName">connecting</small></div>
+  <span class="chip"><span class="dot" id="connDot"></span><span id="connTxt">Connecting</span></span>
+  <span class="chip" id="netChip" title="Network">--</span>
+  <span class="chip" id="battChip" title="Battery"><span class="batt"><i id="battBar" style="width:0"></i></span><span id="battTxt">--</span></span>
+  <span class="chip" id="tempChip" title="Sensor temperature">--</span>
+</div></div>
+
+<nav class="tabs" id="nav" aria-label="Pages">
+  <div class="navbrand"><span class="pulse"></span>CardioResp</div>
+  <a href="#live" data-p="live" style="--c:var(--heart);--cs:var(--heart-soft)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg><span>Live</span><i class="badge"></i></a>
+  <a href="#people" data-p="people" style="--c:var(--breath);--cs:var(--breath-soft)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.6 2.7-6 6-6s6 2.4 6 6"/><circle cx="17.2" cy="9" r="2.4"/><path d="M16 14.3c2.9.3 5 2.4 5 5.7"/></svg><span>People</span><i class="badge"></i></a>
+  <a href="#mesh" data-p="mesh" style="--c:var(--gyro);--cs:var(--gyro-soft)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.3"/><circle cx="19" cy="6" r="2.3"/><circle cx="12" cy="18.5" r="2.3"/><path d="M7.3 6h9.4M6.2 8l4.6 8.4M17.8 8l-4.6 8.4"/></svg><span>Mesh</span><i class="badge"></i></a>
+  <a href="#files" data-p="files" style="--c:var(--ok);--cs:var(--ok-soft)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H10l2 2.5h5.5A2.5 2.5 0 0 1 20 9v8.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z"/><path d="M12 10v6M9.5 13.5 12 16l2.5-2.5"/></svg><span>Files</span><i class="badge"></i></a>
+  <a href="#settings" data-p="settings" style="--c:var(--warn);--cs:var(--warn-soft)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg><span>Settings</span><i class="badge"></i></a>
+</nav>
+<div class="alarmbar" id="alarmBar" hidden role="alert" aria-live="assertive">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><div class="al" id="alarmList"></div>
+  <button class="btn sm" id="alarmSil" type="button">Silence 2 min</button>
+  <button class="ax" id="alarmX" type="button" aria-label="Close the alarm bar (silences for 2 minutes)" title="Close (silences for 2 minutes)">&times;</button>
+</div>
+<div class="wrap">
+  <div class="banner" id="calBanner" role="status">
+    <button class="x" id="calHide" type="button" aria-label="Close this message" title="Close" data-close>&times;</button>
+    <h3 id="calTitle">Calibrating</h3>
+    <div id="calMsg">Keep still and breathe normally.</div>
+    <div class="prog"><i id="calProg"></i></div>
+  </div>
+  <div class="banner alert" id="alertBanner" role="alert"><button class="x" type="button" aria-label="Close this message" title="Close" data-close>&times;</button><h3 id="alertTitle"></h3><div id="alertMsg"></div></div>
+  <div id="netTop"></div>
+  <div class="tip" id="portalTip"><button class="x" type="button" aria-label="Close this message" title="Close" data-close>&times;</button>Opened inside the Wi-Fi sign-in window. For report downloads, open <b>http://192.168.4.1</b> in your normal browser while connected to this network.</div>
+  <div class="lic" id="licBanner" role="alert"><button class="x" type="button" aria-label="Close this message" title="Close" data-close>&times;</button><h3 id="licTitle"></h3><div id="licMsg"></div>
+    <div class="btns"><button class="btn primary" id="licGo" type="button">Enter a new activation key</button><a class="btn" id="licWa" target="_blank" rel="noopener" href="#settings">Request a new licence</a></div></div>
+
+<section class="page" id="pg-live" data-page="live">
+  <h1 class="ltitle">Live <small id="liveSub"></small></h1>
+  <div class="subtabs" id="liveTabs" role="tablist" aria-label="Live sections"><button type="button" data-s="mon">Monitor</button><button type="button" data-s="graphs">Graphs only</button><button type="button" data-s="place">Placement</button><button type="button" data-s="more">Details</button></div>
+  <div class="hero s-wait" id="hero" data-sec="mon place">
+    <div class="hico" id="heroIco"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></div>
+    <div class="htxt">
+      <h2 id="heroTitle" aria-live="polite">Connecting to the monitor</h2>
+      <div class="hmsg" id="heroMsg">Join the monitor's Wi-Fi network if this page does not connect.</div>
+      <ul class="checks" id="heroChecks"></ul>
+    </div>
+    <div class="hprog" id="heroProg" hidden><i id="heroProgBar"></i></div>
+    <div class="hbtns">
+      <button class="btn start" id="btnStart" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true" style="width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M8 5v14l11-7z"/></svg>Start measurement</button>
+      <button class="btn stop" id="btnStop" type="button" hidden>Stop</button>
+      <button class="btn simplebtn" id="btnSimple" type="button" hidden title="Full screen with only the heart rate and the breathing pattern"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Simple view</button>
+    </div>
+  </div>
+  <div class="card" id="orientSec" data-sec="place" style="margin-top:14px">
+    <h3 class="hrow">Sensor placement and gravity <span class="small" id="oSrc"></span></h3>
+    <div class="place">
+      <div class="pfigs">
+        <figure class="torso">
+          <svg viewBox="0 0 140 168" role="img" aria-label="Fix the sensor on the lower breastbone: Y towards the head, X to the person's left, Z out of the chest">
+            <circle class="bd" cx="70" cy="21" r="15"/>
+            <path class="bd" d="M63 34v10h14V34"/>
+            <path class="bd" d="M70 43c-12 0-22 2-32 6-10 4-14 12-16 23l-6 56c-1 6 6 8 8 2l8-46 2 76h72l2-76 8 46c2 6 9 4 8-2l-6-56c-2-11-6-19-16-23-10-4-20-6-32-6z"/>
+            <path class="ln" d="M48 53q12 4 20 2M92 53q-12 4-20 2M45 77q11 9 21 7M95 77q-11 9-21 7M47 91q10 8 19 7M93 91q-10 8-19 7"/>
+            <path class="ln dash" d="M70 57v38"/>
+            <path class="ay" d="M70 96V67M65 73l5-7 5 7"/>
+            <text class="ty" x="76" y="71">Y head</text>
+            <path class="ax" d="M80 102.5h20M95 98l6 4.5-6 4.5"/>
+            <text class="tx" x="91" y="116">X</text>
+            <rect class="sn" x="61" y="96" width="18" height="13" rx="3.5"/>
+            <circle class="zo" cx="70" cy="102.5" r="3.6"/><circle class="zd" cx="70" cy="102.5" r="1.3"/>
+            <text class="tz" x="57.5" y="106" text-anchor="end">Z out</text>
+          </svg>
+          <figcaption>Where to fix it: lower breastbone</figcaption>
+        </figure>
+        <figure class="gfig"><canvas id="cvLevel" aria-label="Gravity direction in the sensor axes"></canvas><figcaption>Gravity now · dashed ring = start position</figcaption></figure>
+      </div>
+      <div>
+        <dl class="kv">
+          <dt>Roll / pitch</dt><dd id="oRP">--</dd>
+          <dt>Axis pointing up</dt><dd id="oUp">--</dd>
+          <dt>Change since calibration</dt><dd id="oTilt">--</dd>
+          <dt>Movement</dt><dd id="oMot">--</dd>
+        </dl>
+        <ul class="checks pcheck" id="oChecks"></ul>
+        <ul class="tips">
+          <li>Fix the sensor on the <b>lower breastbone</b> with a strap or tape: Y towards the head, Z out of the chest.</li>
+          <li>Lying flat on the back, the dot sits near the centre (<b>Z up</b>). Sitting up moves it towards +Y.</li>
+          <li>Press <b>Start measurement</b> and keep still for 8 seconds: the gravity measured then is the reference. After a big change of posture press <b>Stop</b> and <b>Start</b> again.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="toolbar" id="liveBar" data-sec="mon">
+    <button class="btn rec" id="btnLog" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" class="fill"/></svg>Capture 10 min</button>
+    <button class="btn pdf" id="btnPdf" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>PDF report</button>
+    <button class="btn" id="btnCsv" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 10h16M4 15h16M10 5v14"/></svg>CSV</button>
+    <button class="btn" id="btnShare" type="button" disabled hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8.2 11 15.8 7M8.2 13l7.6 4"/></svg>Share</button>
+    <button class="btn" id="btnPrint" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/></svg>Print</button>
+    <span class="tsp"></span>
+    <button class="btn tog" id="btnPause" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg><span>Freeze</span></button>
+    <button class="btn tog snd" id="btnSound" type="button" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span>Alarms on</span></button>
+  </div>
+  <div class="hint" id="logState" data-sec="mon">The monitor keeps the last 10 minutes. Press <b>Capture 10 min</b>, then <b>PDF report</b> for the doctor.</div>
+  <div class="report" id="reportBox" data-sec="mon">
+    <h3 class="subh">Captured 10-minute report <small id="repWhen"></small></h3>
+    <div class="analysis" id="reportAnalysis"></div>
+  </div>
+  <div class="vitals" data-sec="mon graphs">
+    <article class="vital heart" aria-label="Heart">
+      <div class="vhead">
+        <div>
+          <div class="vname"><b>Heart rate</b><span class="sub">1-minute average</span></div>
+          <div class="big dim" id="hrBig">--<small>bpm</small></div>
+        </div>
+        <div class="side">now <b id="hrNow">--</b><br>RMSSD <b id="rmssdTop">--</b> ms<br><span class="range" id="hrRange">--</span></div>
+      </div>
+      <div class="vnote" id="hrArtNote">Heart rate paused: strong breathing movement is shaking the chest. It comes back by itself when breathing calms.</div>
+      <canvas class="strip" id="cvHeart" aria-label="Seismocardiogram and gyrocardiogram trace"></canvas>
+      <div class="vfoot">
+        <span class="sqi">Signal <span class="m"><i id="sqiHBar" style="width:0"></i></span><b id="sqiH">--</b></span>
+        <span>Beats accepted (60 s) <b id="beats60">--</b></span>
+        <span>Fusion accel/gyro <b id="fusion">--</b></span>
+        <span style="color:var(--heart)">SCG</span><span style="color:var(--gyro)">GCG</span>
+      </div>
+    </article>
+    <article class="vital resp" aria-label="Breathing">
+      <div class="vhead">
+        <div>
+          <div class="vname"><b>Breathing rate</b><span class="sub">now (newest breaths)</span></div>
+          <div class="big dim" id="rrBig">--<small>/min</small></div>
+        </div>
+        <div class="side">1 min <b id="rrNow">--</b> &middot; 5 min <b id="rr5Top">--</b><br><span class="bcount">breaths in last min <b id="b1mTop">--</b></span><br>I:E <b id="ieTop">--</b> <span class="range" id="rrRange">--</span></div>
+      </div>
+      <canvas class="strip" id="cvResp" aria-label="Breathing waveform"></canvas>
+      <div class="vfoot">
+        <span class="sqi">Signal <span class="m"><i id="sqiRBar" style="width:0"></i></span><b id="sqiR">--</b></span>
+        <span>Pattern <b id="patternTop">--</b></span>
+        <button class="mini" id="btnPol" type="button" title="Turn the breathing trace upside down if breathing in goes down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/></svg>Flip</button><span class="seg" role="group" aria-label="Breathing window"><button id="w60" aria-pressed="true">1 min</button><button id="w300" aria-pressed="false">5 min</button></span>
+      </div>
+    </article>
+  </div>
+  <div class="card assess s0" id="sevCard" data-sec="mon" aria-live="polite">
+    <h3><span id="sevBadge" class="sev">Waiting</span><span id="sevHead">Waiting for measurements</span></h3>
+    <div class="cond" id="sevCond"></div>
+    <div class="obs" id="obsRow" hidden><span id="obsTxt">Long-term checks</span><span class="m"><i id="obsBar"></i></span></div>
+    <ul class="ev" id="sevEv"></ul>
+    <details class="clin"><summary>Details for clinicians</summary>
+      <div class="meters"><span>Prediction score <b id="sevScore">--</b></span><span>Reliability index <b id="sevRel">--</b></span><span>Source <b id="sevSrc">--</b></span><span>Model says <b id="sevMl">--</b></span><span>NEWS2 (partial) <b id="sevNews">--</b></span></div>
+      <ul class="miss" id="sevMiss"></ul>
+      <div class="pbars fullonly" id="sevBars"></div>
+      <div class="hint">Rule-based severity combines age zones with spectral rules; the tiny ML model (21 inputs, 7 classes) adds a second opinion. Illness patterns (chest infection, sleep apnoea, lasting irregular rhythm, periodic breathing, body-wide stress) are only suggested after 5-30 minutes of calm monitoring, never from a few seconds. Early warning only, not a diagnosis.</div>
+    </details>
+  </div>
+  <div class="card fullonly" id="vibCard" data-sec="more" style="margin-top:14px">
+    <h3>Chest vibration and body temperature <small class="small">values are never hidden; colour shows how far they are from the usual range</small></h3>
+    <div class="vibgrid">
+      <div><span>Heart vibration (RMS accel.)</span><b id="vibA">--</b><small>mg</small></div>
+      <div><span>Peak (5 s)</span><b id="vibPk">--</b><small>mg</small></div>
+      <div><span>Rotation (RMS)</span><b id="vibG">--</b><small>&deg;/s</small></div>
+      <div><span>High-frequency share</span><b id="vibHf">--</b><small>%</small></div>
+      <div><span>Cough bursts / 30 s</span><b id="vibCg">--</b></div>
+      <div><span>Body temperature</span><b id="tbC">--</b><small>&deg;C</small> <b id="tbF" style="font-size:18px">--</b><small>&deg;F</small></div>
+    </div>
+    <div class="hint" id="tbHint">Temperature comes from the sensor's own chip temperature. Calibrate it against a thermometer in Settings.</div>
+  </div>
+  <details class="drop" id="anaDrop" data-sec="more">
+    <summary><span class="dt">Detailed analysis</span><span class="ds">charts, advanced tools, spectra, then interpretation and the alarm log</span></summary>
+    <div class="dropin">
+      <h3 class="subh">Charts</h3>
+      <div class="grid g2">
+        <div class="card"><h3 class="hrow">Heart and breathing trend <span class="seg" id="trWin" role="group" aria-label="Trend window"><button type="button" data-w="600" aria-pressed="false">10 min</button><button type="button" data-w="3600" aria-pressed="false">1 h</button><button type="button" data-w="0" aria-pressed="true">All</button></span></h3><canvas class="chart" id="cvTrend" style="height:170px"></canvas><p>This session: <span style="color:var(--heart)">heart rate</span> and <span style="color:var(--breath)">breathing rate</span>.</p></div>
+        <div class="card"><h3>Beat-to-beat intervals</h3><canvas class="chart" id="cvTacho" style="height:170px"></canvas><p id="tachoTxt">Tachogram of accepted intervals.</p></div>
+        <div class="card"><h3>Poincar&eacute; plot</h3><canvas class="chart" id="cvPoinc" style="height:220px"></canvas><p id="poincTxt">Each interval against the next. A tight cloud means a regular rhythm.</p></div>
+        <div class="card fullonly" id="axesCard">
+        <h3>Dominant signal axes (adaptive PCA)</h3>
+        <canvas class="chart" id="cvAxes" style="height:130px"></canvas>
+        <p>The processor finds, in any placement, the 3-D direction carrying most heart vibration (accelerometer and gyroscope) and most breathing tilt, and fuses them by signal quality.</p>
+      </div>
+      </div>
+      <h3 class="subh fullonly">Advanced tools</h3>
+      <div class="grid g3 fullonly" id="advSec">
+        <div class="card" id="ensCard"><h3>Average heartbeat</h3><canvas class="chart" id="cvEns" style="height:200px"></canvas><p id="ensTxt">Averages the chest vibration of the recent beats, aligned on the beat marker.</p></div>
+        <div class="card" id="histCard"><h3>Beat-interval histogram</h3><canvas class="chart" id="cvHist" style="height:150px"></canvas><dl class="kv" id="hrvStats" style="margin-top:6px"></dl></div>
+        <div class="card" id="bbbCard"><h3>Breath by breath</h3><canvas class="chart" id="cvBreaths" style="height:150px"></canvas><p id="bbbTxt">Rate (bars) and depth (dots) of each recent breath.</p></div>
+      </div>
+      <h3 class="subh fullonly" id="spectraSecH">Frequency analysis <small>FFT</small></h3>
+      <div class="grid g3" id="spectraSec">
+    <div class="card"><h3>Heart-beat rhythm spectrum</h3><canvas class="chart" id="cvSpecC"></canvas><p id="specCTxt">Spectrum of the fused beat envelope over 60 s. The tallest peak is the heart rate.</p></div>
+    <div class="card"><h3>Breathing spectrum</h3><canvas class="chart" id="cvSpecR"></canvas><p id="specRTxt">Welch spectrum of the chest-tilt signal over 5 minutes.</p></div>
+    <div class="card"><h3>Chest vibration spectrum</h3><canvas class="chart" id="cvSpecV"></canvas><p>Raw 0&ndash;50 Hz content on the dominant accelerometer and gyroscope axes (dB). Heart sounds sit in 5&ndash;30 Hz.</p></div>
+  </div>
+      <h3 class="subh fullonly" id="analysisH">Interpretation <small id="anaWhen"></small></h3>
+      <div class="analysis" id="analysis"><section><p class="hint">Waiting for measurements.</p></section></div>
+      <div class="grid g2" style="margin-top:14px">
+        <div class="card" id="evCard"><h3 class="hrow">Alarm and event log <button class="btn sm" id="evCsv" type="button">Download CSV</button></h3><div class="tablewrap"><table class="files" id="evTab"><thead><tr><th>Start</th><th>Alarm</th><th>Level</th><th>Details</th><th>Duration</th></tr></thead><tbody><tr><td colspan="5">No alarms since this page was opened.</td></tr></tbody></table></div><p class="hint">Kept in this browser while the page is open (last 300 events).</p></div>
+        <div class="card"><h3>Recent breaths</h3><div class="tablewrap"><table id="brTable"><thead><tr><th>Time</th><th>Cycle s</th><th>In s</th><th>Out s</th><th>I:E</th><th>Depth &deg;</th></tr></thead><tbody></tbody></table></div></div>
+      </div>
+    </div>
+  </details>
+</section>
+<section class="page" id="pg-people" data-page="people">
+  <h2>Patient and age</h2>
+  <div class="grid g2">
+    <div class="card">
+      <h3>Age sets the normal ranges and detector limits</h3>
+      <div class="row">
+        <div><label for="ageVal">Age</label><input id="ageVal" type="number" min="0" max="120" step="1" inputmode="decimal"></div>
+        <div><label for="ageUnit">Unit</label><select id="ageUnit"><option value="y">years</option><option value="m">months</option></select></div>
+        <div style="flex:0 0 auto"><button class="btn primary" id="ageApply">Apply age</button></div>
+      </div>
+      <div class="agegroup" id="ageGroup">--</div>
+    </div>
+    <div class="card">
+      <h3>Report details</h3>
+      <div class="row">
+        <div><label for="pName">Name</label><input id="pName" type="text" autocomplete="off"></div>
+        <div><label for="pId">Patient ID</label><input id="pId" type="text" autocomplete="off"></div>
+      </div>
+      <div class="row">
+        <div><label for="pSex">Sex</label><select id="pSex"><option value="">not stated</option><option>female</option><option>male</option><option>other</option></select></div>
+        <div><label for="pPlace">Sensor placement</label><select id="pPlace"><option>front (sternum)</option><option>front (left chest)</option><option>side of ribcage</option><option>back</option></select></div>
+        <div><label for="pPost">Posture</label><select id="pPost"><option>lying on back</option><option>lying on side</option><option>lying on front</option><option>sitting</option><option>standing</option></select></div>
+      </div>
+      <label for="pNotes">Notes for the doctor</label><textarea id="pNotes"></textarea>
+    </div>
+  </div>
+  <h2>Patient profile stored on the monitor</h2>
+  <div class="grid g2"><div class="card" id="dpCard">
+    <p class="hint" style="margin-top:0">Shown on the Mesh page of every monitor and saved in each recording.</p>
+    <div class="row"><div><label for="dpName">Name</label><input id="dpName" type="text" maxlength="31"></div><div><label for="dpId">Patient ID</label><input id="dpId" type="text" maxlength="19"></div></div>
+    <div class="row"><div><label for="dpSex">Sex</label><select id="dpSex"><option value="">not stated</option><option>female</option><option>male</option><option>other</option></select></div>
+      <div><label for="dpBed">Bed / room</label><input id="dpBed" type="text" maxlength="15"></div></div>
+    <div class="row"><div><label for="dpPlace">Sensor placement</label><select id="dpPlace"><option>front (sternum)</option><option>front (left chest)</option><option>side of ribcage</option><option>back</option></select></div>
+      <div><label for="dpPost">Posture</label><select id="dpPost"><option>lying on back</option><option>lying on side</option><option>lying on front</option><option>sitting</option><option>standing</option></select></div></div>
+    <label for="dpNotes">Notes</label><textarea id="dpNotes" maxlength="119"></textarea>
+    <div class="btns"><button class="btn primary" id="dpSave" type="button">Save patient profile</button></div><div class="hint" id="dpMsg"></div>
+  </div></div>
+  <h2>Nurse</h2>
+  <div class="grid g2"><div class="card" id="nuCard">
+    <div class="row"><div><label for="nuName">Name</label><input id="nuName" type="text" maxlength="31"></div><div><label for="nuId">Staff ID</label><input id="nuId" type="text" maxlength="19"></div></div>
+    <div class="row"><div><label for="nuWard">Ward</label><input id="nuWard" type="text" maxlength="23"></div><div><label for="nuPhone">Phone</label><input id="nuPhone" type="text" maxlength="23" inputmode="tel"></div></div>
+    <label for="nuShift">Shift</label><select id="nuShift"><option value="">not stated</option><option>morning</option><option>afternoon</option><option>night</option></select>
+    <div class="btns"><button class="btn primary" id="nuSave" type="button">Save nurse profile</button></div><div class="hint" id="nuMsg"></div>
+  </div>
+  <div class="card"><h3>Patient in this nurse's care</h3><dl class="who" id="nuPat"><dt>Patient</dt><dd>--</dd></dl></div></div>
+</section>
+<section class="page" id="pg-mesh" data-page="mesh">
+
+  <h2>Mesh <small id="meshSub"></small></h2>
+  <div class="card">
+    <div class="btns" style="margin-top:0">
+      <button class="btn primary" id="meshAll" type="button">Update all</button>
+      <button class="btn" id="meshTog" type="button">Switch mesh on</button>
+    </div>
+    <p class="hint" id="meshInfo">Every monitor that has the mesh switched on and uses the same Wi-Fi channel is listed here with its patient, heart rate, breathing rate and severity. "Update all" asks every monitor for its newest data at once.</p>
+  </div>
+  <div class="meshgrid" id="meshGrid" style="margin-top:14px"></div>
+  <h2>Monitors on this Wi-Fi network</h2>
+  <div class="card" id="peerCard">
+    <p class="hint" style="margin-top:0" id="peerLead">Every monitor on the same Wi-Fi has a simple address: the first is <b>cardio.local</b>, the next <b>cardio2.local</b>, and so on. Tap one to open it.</p>
+    <div class="peers" id="peerList"></div>
+    <div class="btns"><button class="btn" id="peerScan" type="button">Search again</button></div>
+  </div>
+</section>
+<section class="page" id="pg-files" data-page="files">
+  <h2>Recordings</h2>
+  <div class="grid g2">
+    <div class="card">
+      <h3>Record to the monitor's memory</h3>
+      <div class="row"><div><label for="recSec">Length</label><select id="recSec"><option value="60" selected>1 minute</option><option value="30">30 seconds</option><option value="90">90 seconds</option><option value="120">2 minutes</option></select></div>
+        <div style="flex:0 0 auto"><button class="btn primary" id="recGo" type="button">Start recording</button></div>
+        <div style="flex:0 0 auto"><button class="btn" id="recStop" type="button" hidden>Stop</button></div></div>
+      <div class="prog big" style="margin-top:10px"><i id="recProg"></i></div>
+      <div class="hint" id="recMsg">Stores heart rate, breathing rate, severity, temperature and (with a valid licence) the vibration waveforms, about one minute per file.</div>
+    </div>
+    <div class="card">
+      <h3>Saved recordings <small class="small" id="fileFree"></small></h3>
+      <div class="tablewrap"><table class="files" id="fileTab"><thead><tr><th>File</th><th>Size</th><th>Report and data</th></tr></thead><tbody><tr><td colspan="3">loading</td></tr></tbody></table></div>
+      <div class="btns"><button class="btn pdf" id="filePdfAll" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>PDF of all recordings</button><button class="btn" id="fileAll" type="button">All as CSV (ZIP)</button><button class="btn" id="fileRaw" type="button">Raw .crr files</button><button class="btn warn" id="fileDelAll" type="button">Delete all</button></div>
+      <div class="hint" id="fileMsg"></div>
+    </div>
+  </div>
+  <p class="hint">Each saved recording can be turned into a PDF results report (trends, ranges, severity, waveforms) or a CSV file. For the 10-minute history of the live monitor, use <b>Capture 10 min</b> on the Live page.</p>
+</section>
+<section class="page" id="pg-settings" data-page="settings">
+  <h2>Display and alarms</h2>
+  <div class="grid g2">
+    <div class="card" id="themeCard">
+      <h3>Theme</h3>
+      <div class="seg wide" role="group" aria-label="Theme" id="themeSeg"><button type="button" data-th="auto" aria-pressed="true">Auto</button><button type="button" data-th="light" aria-pressed="false">Light</button><button type="button" data-th="dark" aria-pressed="false">Dark</button></div>
+      <p>Auto follows the phone or computer setting. Dark is easier on the eyes at night and saves battery on OLED screens. The choice is remembered on this phone.</p>
+    </div>
+    <div class="card" id="alarmCard">
+      <h3>Alarm sounds</h3>
+      <div class="row" style="align-items:center">
+        <label class="inline sw"><input type="checkbox" id="alOn" checked><span>Sound alarms on</span></label>
+        <div><label for="alVol">Volume <b id="alVolTxt">70 %</b></label><input type="range" id="alVol" min="10" max="100" step="5" value="70"></div>
+      </div>
+      <div class="tablewrap"><table class="altab" id="alTab"><thead><tr><th>On</th><th>Alarm, when it starts, and its sound</th><th></th></tr></thead><tbody></tbody></table></div>
+      <div class="hint" id="alState">--</div>
+      <div class="hint badt" id="alLite" hidden>Without a valid licence the "heart signal lost" and "cough / vibration" alarms are not available. The other alarms keep working.</div>
+      <label class="inline"><input type="checkbox" id="alVib" checked><span>Also vibrate the phone for urgent alarms</span></label>
+      <div class="hint">Each kind of alarm has its own sound. Urgent alarms repeat every 4 s, warnings every 10 s, notices every 20 s. Safety alarms (heart signal lost, breathing pause, sensor lost, no data) cannot be switched off one by one. Sound plays only after the page has been tapped once, and only while this page is open with the screen on. <b>Silence</b> on the alarm bar mutes the current alarms for 2 minutes; a new alarm, an alarm that comes back or one that gets worse still sounds. Switching all alarm sounds off lasts until the page is opened again.</div>
+    </div>
+  </div>
+  <h2>Alarm limits <small class="small">set points and time windows</small></h2>
+  <div class="card" id="almCard">
+    <p class="hint" style="margin-top:0" id="almSrc">Loading the alarm limits...</p>
+    <div class="lims" id="almView"></div>
+    <div class="btns" id="almBtns"><button class="btn primary" id="almEdit" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Change the limits (doctor / nurse)</button></div>
+    <div id="almLogin" hidden>
+      <label for="almPin">Doctor / nurse PIN</label>
+      <div class="row"><div><input id="almPin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="4 to 8 digits"></div>
+        <div style="flex:0 0 auto"><button class="btn primary" id="almUnlock" type="button">Unlock</button></div>
+        <div style="flex:0 0 auto"><button class="btn" id="almCancel" type="button">Cancel</button></div></div>
+    </div>
+    <div id="almForm" hidden>
+      <label class="inline sw"><input type="checkbox" id="almAuto"><span>Use the age-based defaults (they follow the age set on the People page)</span></label>
+      <div class="row"><div><label for="almBy">Your name (kept with the change)</label><input id="almBy" type="text" maxlength="23" autocomplete="off"></div></div>
+      <div class="btns"><button class="btn primary" id="almSave" type="button">Save the limits</button><button class="btn" id="almFill" type="button">Fill in the defaults</button><button class="btn" id="almLock" type="button">Lock</button></div>
+      <details class="almpin"><summary>Change the doctor / nurse PIN</summary>
+        <div class="row"><div><label for="almNew1">New PIN (4 to 8 digits)</label><input id="almNew1" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></div>
+          <div><label for="almNew2">Repeat the new PIN</label><input id="almNew2" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></div></div>
+        <div class="btns"><button class="btn" id="almPinSave" type="button">Change PIN</button></div>
+      </details>
+    </div>
+    <div class="hint" id="almMsg"></div>
+    <div class="hint badt" id="almPinWarn" hidden>The doctor / nurse PIN is still the factory PIN (1234 unless it was changed in config.h). Unlock and change it, so that only doctors and nurses can change the alarm limits.</div>
+    <details class="almlog"><summary>Change history</summary><ul class="almlogl" id="almLog"><li>No changes yet.</li></ul></details>
+    <p class="hint">Alarms sound on this page when a value stays beyond a limit for the delay (time window). Warning limits repeat every 10 s, urgent limits every 4 s. These limits are kept on the monitor, so every phone uses the same ones. The written assessment still uses the normal resting ranges for the age.</p>
+  </div>
+  <h2>Calibration</h2>
+  <div class="grid g2" id="calSec">
+    <div class="card" id="calCard">
+      <h3>Sensor calibration (gravity reference)</h3>
+      <p>Recalibrate after fixing the sensor again or after a large change of posture. The person must keep completely still for about 8 seconds while the monitor measures gravity. (Start measurement on the Live page always calibrates first.)</p>
+      <div class="btns"><button class="btn warn" id="btnRecal" type="button">Recalibrate sensor</button><button class="btn" id="btnReset" type="button">Restart measurement</button></div>
+      <dl class="kv" id="devSensor" style="margin-top:10px"></dl>
+    </div>
+    <div class="card" id="acalCard">
+      <h3>Accelerometer calibration (6 positions)</h3>
+      <p>Only needed when the start-up check reports a gravity reading far from 1.00 g. Take the sensor off the body, rest it on a flat table and capture each of its six faces pointing up (both flat sides, both long edges, both ends). Keep it untouched for 2 s per capture.</p>
+      <div class="faces" id="acalFaces"></div>
+      <div class="btns">
+        <button class="btn primary" id="acalCap">Capture position</button>
+        <button class="btn" id="acalSave" disabled>Save calibration</button>
+        <button class="btn" id="acalClear">Start over</button>
+        <button class="btn warn" id="acalRemove" hidden>Remove stored calibration</button>
+      </div>
+      <div class="hint" id="acalMsg"></div>
+      <dl class="kv" id="acalState" style="margin-top:8px"></dl>
+    </div>
+    <div class="card" id="tcCard">
+      <h3>Body temperature calibration</h3>
+      <p>The sensor reads its own chip temperature. Enter a reference thermometer reading while the sensor is on the skin and the monitor will correct the offset.</p>
+      <div class="row"><div><label for="tcRef">Reference</label><input id="tcRef" type="number" step="0.1" inputmode="decimal"></div>
+        <div><label for="tcUnit">Unit</label><select id="tcUnit"><option value="C">&deg;C</option><option value="F">&deg;F</option></select></div></div>
+      <div class="btns"><button class="btn primary" id="tcSave" type="button">Calibrate</button><button class="btn" id="tcReset" type="button">Reset offset</button></div>
+      <div class="hint" id="tcMsg"></div>
+    </div>
+  </div>
+  <h2>Mesh network</h2>
+  <div class="grid g2" id="meshSec">
+    <div class="card" id="mgCard">
+      <h3>Mesh settings</h3>
+      <p>Monitors share their patients with each other over a short-range radio link; no router is needed. Only monitors with the <b>same group name and PIN</b> are accepted: every message is signed with them.</p>
+      <label class="inline sw"><input type="checkbox" id="mgOn"><span>Mesh on</span></label>
+      <div class="row">
+        <div><label for="mgGrp">Group name</label><input id="mgGrp" type="text" maxlength="15" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="ward"></div>
+        <div><label for="mgPin">PIN (4 to 8 digits)</label><div class="row"><div><input id="mgPin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="unchanged"></div><div style="flex:0 0 auto"><button class="btn" id="mgPinShow" type="button">Show</button></div></div></div>
+      </div>
+      <label class="inline"><input type="checkbox" id="mgOpen"><span>No PIN (open mesh: any monitor with this group name is accepted)</span></label>
+      <div class="row">
+        <div><label for="mgLbl">Label of this monitor (bed / room)</label><input id="mgLbl" type="text" maxlength="15" autocomplete="off" placeholder="e.g. Bed 4"></div>
+        <div><label for="mgPer">Send every</label><select id="mgPer"><option value="1000">1 s</option><option value="2000">2 s</option><option value="5000">5 s</option><option value="10000">10 s</option></select></div>
+        <div><label for="mgTtl">Relay hops</label><select id="mgTtl"><option value="0">0 (direct only)</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+      </div>
+      <dl class="kv" id="mgInfo" style="margin-top:10px"></dl>
+      <div class="btns"><button class="btn primary" id="mgSave" type="button">Save mesh settings</button></div>
+      <div class="hint" id="mgMsg">Use the same group name and PIN on every monitor that should share data. Relay hops let monitors pass on messages from monitors further away. All monitors must use the same Wi-Fi channel.</div>
+    </div>
+    <div class="card" id="mgVerCard">
+      <h3>Verify nearby monitors</h3>
+      <p>Asks every monitor in radio range to answer and lists them. <b class="okt">Verified</b> monitors share data with this one; the others need the same group name and PIN.</p>
+      <div class="btns" style="margin-top:6px"><button class="btn primary" id="mgVerify" type="button">Verify nearby monitors</button></div>
+      <div class="tablewrap" style="margin-top:10px"><table class="files" id="mgTab"><thead><tr><th>Monitor</th><th>Signal</th><th>Status</th></tr></thead><tbody><tr><td colspan="3">Press <b>Verify nearby monitors</b>.</td></tr></tbody></table></div>
+      <div class="hint" id="mgVMsg"></div>
+    </div>
+  </div>
+  <h2>Power, network and system</h2>
+  <div class="grid g2" id="deviceSec">
+    <div class="card" id="pwCard">
+      <h3>Power and heat mode</h3>
+      <p>Lower modes run the processor slower and send less data, so the monitor stays cooler and the battery lasts longer. The monitor also steps down by itself when it is hot, and boosts for a few minutes if the analysis falls behind.</p>
+      <div class="row"><div><label for="pwSel">Mode</label><select id="pwSel"><option value="0">Performance (160 MHz, smoothest traces)</option><option value="1">Cool (80 MHz, recommended)</option><option value="2">Eco (80 MHz, coolest, slower updates)</option></select></div>
+        <div style="flex:0 0 auto"><button class="btn primary" id="pwSave" type="button">Apply</button></div></div>
+      <dl class="kv" id="pwInfo"></dl><div class="hint" id="pwMsg"></div>
+    </div>
+    <div class="card" id="perfCard">
+      <h3>Performance and heat</h3><dl class="kv" id="perfInfo"></dl>
+    </div>
+    <div id="netHome">
+    <div class="card" id="netCard">
+      <h3 id="netTitle">Network</h3>
+      <dl class="kv" id="netInfo"><dt>Status</dt><dd>checking</dd></dl>
+      <div class="share" id="netShare" hidden>
+        <div class="addr"><span>Open this monitor on any phone or computer on the same Wi-Fi</span><a id="netAddr" href="#">--</a><small id="netAddr2"></small></div>
+        <div class="qrs">
+          <figure id="qrOpenFig"><div class="qr" id="qrOpen"></div><figcaption>Scan to open this monitor</figcaption></figure>
+          <figure id="qrJoinFig"><div class="qr" id="qrJoin"></div><figcaption>Scan to join the monitor's own Wi-Fi</figcaption></figure>
+        </div>
+      </div>
+      <label class="inline sw" id="netApKeepRow"><input type="checkbox" id="netApKeep"><span>Keep the monitor's own Wi-Fi on next to the home Wi-Fi (anyone nearby can join it; the page then opens by itself)</span></label>
+      <div class="btns" id="netBtns">
+        <button class="btn" id="netChange">Connect to a Wi-Fi network</button>
+        <button class="btn" id="netFix" hidden>Keep this address fixed</button>
+        <button class="btn warn" id="netForget" hidden>Forget home Wi-Fi</button>
+      </div>
+      <div id="netForm" hidden>
+        <p class="hint" id="netLead">The monitor joins this network at every start and shows the dashboard at an address on it. If the network is not available, the monitor opens its own network again, so it always stays reachable. 2.4 GHz networks only.</p>
+        <label for="wSel">Network</label>
+        <div class="row"><div><select id="wSel"><option value="">Scanning...</option></select></div><div style="flex:0 0 auto"><button class="btn" id="wScan" type="button">Scan</button></div></div>
+        <label for="wSsid">Network name (if hidden or not in the list)</label>
+        <input id="wSsid" type="text" autocomplete="off" autocapitalize="none" spellcheck="false">
+        <label for="wPass">Password</label>
+        <div class="row"><div><input id="wPass" type="password" autocomplete="off" autocapitalize="none" spellcheck="false"></div><div style="flex:0 0 auto"><button class="btn" id="wShow" type="button">Show</button></div></div>
+        <label for="wHost">Name of the monitor on the network (leave empty for automatic: cardio, cardio2, cardio3 ...)</label>
+        <div class="row"><div><input id="wHost" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="automatic"></div><div style="flex:0 0 auto;align-self:center;color:var(--muted)">.local</div></div>
+        <details id="wAdv"><summary>Fixed IP address (optional)</summary>
+          <label class="inline"><input type="checkbox" id="wStatic"> Use a fixed address</label>
+          <div class="row"><div><label for="wIp">IP address</label><input id="wIp" type="text" inputmode="decimal" placeholder="192.168.1.50"></div><div><label for="wGw">Gateway (router)</label><input id="wGw" type="text" inputmode="decimal" placeholder="192.168.1.1"></div></div>
+          <div class="row"><div><label for="wMask">Subnet mask</label><input id="wMask" type="text" inputmode="decimal" value="255.255.255.0"></div><div><label for="wDns">DNS (optional)</label><input id="wDns" type="text" inputmode="decimal"></div></div>
+          <p class="hint">Pick an address outside the router's automatic range, or reserve it in the router. Simpler: connect normally, then press "Keep this address fixed".</p>
+        </details>
+        <div class="btns">
+          <button class="btn primary" id="wConnect">Connect</button>
+          <button class="btn" id="wSkip" hidden>Not now, use the direct connection</button>
+          <button class="btn" id="wCancel">Cancel</button>
+        </div>
+      </div>
+      <div class="netmsg" id="netMsg" hidden></div>
+    </div>
+    </div>
+    <div class="card"><h3>System</h3><dl class="kv" id="devSys"></dl></div>
+  </div>
+  <h2>Restart and reset</h2>
+  <div class="grid g2">
+    <div class="card" id="rstCard">
+      <h3>Restart the monitor</h3>
+      <p>Switches the monitor off and on again. Settings, recordings and the licence are kept. A measurement that was running starts again by itself.</p>
+      <div class="btns"><button class="btn" id="btnReboot" type="button">Restart monitor</button></div>
+      <div class="hint" id="rbMsg"></div>
+    </div>
+    <div class="card danger-zone" id="facCard">
+      <h3>Factory reset</h3>
+      <p>Erases the Wi-Fi network, age, calibrations, temperature offset, power mode, mesh settings, patient and nurse profiles and <b>all recordings</b>, then restarts. The licence (activation key) is <b>kept</b>.</p>
+      <label class="inline chk"><input type="checkbox" id="facLic"><span>Also remove the licence key</span></label>
+      <div class="btns"><button class="btn danger" id="btnFactory" type="button">Factory reset</button></div>
+      <div class="hint" id="facMsg"></div>
+    </div>
+  </div>
+  <h2>Licence and firmware</h2>
+  <div class="grid g2">
+    <div class="card" id="licCard">
+      <h3>Licence</h3>
+      <dl class="kv" id="licInfo"></dl>
+      <label for="licTok">Activation key</label><textarea id="licTok" spellcheck="false" autocomplete="off" placeholder="Paste the key from the activation generator"></textarea>
+      <div class="btns"><button class="btn primary" id="licAct" type="button">Activate</button><button class="btn" id="licCopy" type="button">Copy device ID (MAC)</button><button class="btn warn" id="licDel" type="button">Remove key</button></div>
+      <div class="hint" id="licMsg2">The key is bound to this monitor's MAC address and has an expiry date. Without a valid key only heart rate, breathing rate and the sensor placement are shown.</div>
+    </div>
+    <div class="card" id="fwCard">
+      <h3>Firmware update</h3>
+      <p>Choose the update file (<b>.bin</b>) you received from the supplier. The monitor restarts when the upload finishes. Keep the phone close to the monitor and the monitor on power.</p>
+      <input type="file" id="fwFile" accept=".bin">
+      <div class="row" id="fwKeyRow" hidden><div><label for="fwKey">Update password</label><input id="fwKey" type="password" autocomplete="off"></div></div>
+      <div class="prog big" style="margin-top:10px"><i id="fwProg"></i></div>
+      <div class="btns"><button class="btn primary" id="fwGo" type="button" disabled>Upload and install</button></div>
+      <div class="hint" id="fwMsg">Version <span id="fwVer">--</span></div>
+    </div>
+  </div>
+  <h2>About</h2>
+  <div class="grid g2">
+    <div class="card"><h3>Designer</h3>
+      <dl class="who"><dt>Name</dt><dd id="abName">--</dd><dt>Organisation</dt><dd id="abOrg">--</dd><dt>Email</dt><dd><a id="abMail" href="#">--</a></dd><dt>Phone</dt><dd><a id="abTel" href="#">--</a></dd><dt>WhatsApp</dt><dd><a id="abWa" href="#" target="_blank" rel="noopener">--</a></dd></dl>
+      <div class="btns"><a class="btn primary" id="abWaBtn" href="#" target="_blank" rel="noopener">Chat on WhatsApp</a></div>
+    </div>
+    <div class="card"><h3>This monitor</h3><dl class="kv" id="abInfo"></dl></div>
+  </div>
+</section>
+
+  <p class="disclaimer">CardioResp is a research and wellness instrument based on seismocardiography (chest vibration) and chest-wall motion. It is not a certified medical device and does not replace ECG, pulse oximetry or clinical assessment. Results depend on sensor contact and stillness. Share the report with a qualified clinician for interpretation.</p>
+</div>
+
+<div class="simple" id="simple" hidden role="dialog" aria-modal="true" aria-label="Simple view: heart rate and breathing">
+  <div class="sbar">
+    <span class="sstate" id="sState">Connecting</span>
+    <span class="sclock" id="sClock"></span>
+    <button class="sx" id="simpleX" type="button" aria-label="Close the simple view" title="Close">&times;</button>
+  </div>
+  <div class="sgrid">
+    <section class="scell heart"><div class="slab"><svg class="shb" id="sHb" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>Heart rate</div>
+      <div class="sbig" id="sHr">--<small>bpm</small></div><div class="ssub" id="sHrSub"></div></section>
+    <section class="scell resp"><div class="slab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12c2.5-5 5-5 7.5 0s5 5 7.5 0 2.5-2.5 3-2.5"/></svg>Breathing</div>
+      <div class="sbig" id="sRr">--<small>/min</small></div><div class="ssub" id="sRrSub"></div></section>
+    <section class="swave"><canvas id="cvSimple" aria-label="Breathing pattern of the last minute"></canvas><div class="swl">Breathing pattern &middot; last minute &middot; breathing in = up</div>
+      <div class="sidle" id="sIdle" hidden><p id="sIdleMsg">Not measuring</p><button class="btn start" id="sStart" type="button" hidden>Start measurement</button></div></section>
+  </div>
+</div>
+
+<script id="core">
+/*__CORE__*/
+</script>
+<script id="ui">
+/*__UI__*/
+</script>
+<script id="alarm">
+/*__ALARM__*/
+</script>
+<script id="ext">
+/*__EXT__*/
+</script>
+</body>
+</html>

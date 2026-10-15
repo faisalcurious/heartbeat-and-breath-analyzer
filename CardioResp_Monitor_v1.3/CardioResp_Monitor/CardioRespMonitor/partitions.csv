@@ -1,0 +1,6 @@
+# Name,   Type, SubType, Offset,   Size,     (4 MB flash: two 1.69 MB app slots for Wi-Fi updates + 576 kB storage)
+nvs,      data, nvs,     0x9000,   0x5000,
+otadata,  data, ota,     0xe000,   0x2000,
+app0,     app,  ota_0,   0x10000,  0x1B0000,
+app1,     app,  ota_1,   0x1C0000, 0x1B0000,
+spiffs,   data, spiffs,  0x370000, 0x90000,
